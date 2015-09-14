@@ -205,7 +205,7 @@ int isNotEqual(int x, int y) {
  *   Rating: 2
  */
 int getByte(int x, int n) {
-  return (x >> (n << 3)) & 0x000000FF; 
+  return (x >> (n << 3)) & 0xFF; 
 }
 /* 
  * copyLSB - set all bits of result to least significant bit of x
@@ -244,7 +244,40 @@ int logicalShift(int x, int n) {
  *   Rating: 4
  */
 int bitCount(int x) {
-  return 2;
+  // size of the chunks
+  int word_size = 4; 
+  int words_per_x = 8;
+  // mask to select least sig bit per chunk
+  int mask0 = 0x11111111;
+  int mask1 = 0x22222222;
+  int mask2 = 0x44444444;
+  int mask3 = 0x88888888;
+
+  int sum0 = x & mask0;
+  int sum1 = (x & mask1) >> 1;
+  int sum2 = (x & mask1) >> 2;
+  int sum3 = (x & mask1) >> 3;
+
+  // now in each chunk we have stored the numbers of ones in that chunk
+  int ones_per_word = sum0 + sum1 + sum2 + sum3;
+
+  mask0 = 0x0000000F;
+  mask1 = 0x000000F0;
+  mask2 = 0x00000F00;
+  mask3 = 0x0000F000;
+  int mask4 = 0x000F0000;
+  int mask5 = 0x00F00000;
+  int mask6 = 0x0F000000;
+  int mask7 = 0xF0000000;
+
+  int chunk0 = ones_per_word & mask0;
+  int chunk1 = (ones_per_word & mask1) >> 4;
+  int chunk2 = (ones_per_word & mask2) >> 8;
+  int chunk3 = (ones_per_word & mask3) >> 12;
+  int chunk4 = (ones_per_word & mask4) >> 16;
+
+
+
 }
 /* 
  * bang - Compute !x without using !
@@ -274,7 +307,7 @@ int leastBitPos(int x) {
  *   Rating: 1
  */
 int tmax(void) {
-  return 2;
+  return 0x7fffffff;
 }
 /* 
  * isNonNegative - return 1 if x >= 0, return 0 otherwise 
@@ -284,7 +317,8 @@ int tmax(void) {
  *   Rating: 3
  */
 int isNonNegative(int x) {
-  return 2;
+  int first_bit = x & 0x80000000;
+  return !(!first_bit);
 }
 /* 
  * isGreater - if x > y  then return 1, else return 0 
