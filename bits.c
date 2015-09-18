@@ -193,7 +193,7 @@ int bitXor(int x, int y) {
 int isNotEqual(int x, int y) {
   // compare the strings using bitwise Xor, if any are true, 
   // the string are not equal and we return 1 using negated !
-  x = bitXor(x, y);
+  x = (~(x & y)) & (~((~x) & (~y)));
   return !(! (x));
 }
 /* 
@@ -230,12 +230,17 @@ int logicalShift(int x, int n) {
   // printf("%d is the first shift should be 0\n", sx);
   // int subtract = (((32  + (~n)) + 1) & 32);
   // printf("%d is subtract, should be 31\n", subtract);
-  // printf("%d\n", ((n  + (~1) + 1) & 31));
-  int bitMask = 0x80000000 >> ((n  + (~1) + 1) & 31);
-  // printf("%x is bitmask, should be 0xFFFFFFFFFF\n", bitMask);
-  // printf("%d\n", subtract);
+  int max_negative = (0x1 << 31);
+  int negative_one = max_negative >> 31;
+  
+  int bitMask = max_negative  >> (n  + negative_one);
+
+  int n_is_zero = ((!n) << 31) >> 31;
+  bitMask = ( n_is_zero ) | ( ~(n_is_zero) & (~ bitMask ));
+
   return sx & bitMask;
 }
+
 /*
  * bitCount - returns count of number of 1's in word
  *   Examples: bitCount(5) = 2, bitCount(7) = 3
@@ -245,39 +250,45 @@ int logicalShift(int x, int n) {
  */
 int bitCount(int x) {
   // size of the chunks
-  int word_size = 4; 
-  int words_per_x = 8;
-  // mask to select least sig bit per chunk
-  int mask0 = 0x11111111;
-  int mask1 = 0x22222222;
-  int mask2 = 0x44444444;
-  int mask3 = 0x88888888;
 
+  // int word_size = 8; 
+  // int words_per_x = 4;
+  // mask to select least sig bit per chunk
+  
+  int maskpre = 0x1 + (0x1 << 8);
+  int mask0 = maskpre + (maskpre << 16);
+
+
+  // printf( "%x \n %x \n %x \n %x \n", mask0, mask1, mask2, mask3, mask7);
+  
   int sum0 = x & mask0;
-  int sum1 = (x & mask1) >> 1;
-  int sum2 = (x & mask1) >> 2;
-  int sum3 = (x & mask1) >> 3;
+  int sum1 = (x >> 1) & mask0;
+  int sum2 = (x >> 2) & mask0;
+  int sum3 = (x >> 3) & mask0;
+  int sum4 = (x >> 4) & mask0;
+  int sum5 = (x >> 5) & mask0;
+  int sum6 = (x >> 6) & mask0;
+  int sum7 = (x >> 7) & mask0;
+
+
+  //goal: 0x01FFFFFF to get rid of sign extension
+  int auxMask = ~((1 << 31) >> 6);
+
+  int sum7new = sum7 & (auxMask);
 
   // now in each chunk we have stored the numbers of ones in that chunk
-  int ones_per_word = sum0 + sum1 + sum2 + sum3;
+  int ones_per_word = sum0 + sum1 + sum2 + sum3 + sum4 + sum5 + sum6 + sum7new;
 
-  mask0 = 0x0000000F;
-  mask1 = 0x000000F0;
-  mask2 = 0x00000F00;
-  mask3 = 0x0000F000;
-  int mask4 = 0x000F0000;
-  int mask5 = 0x00F00000;
-  int mask6 = 0x0F000000;
-  int mask7 = 0xF0000000;
+  int maskFF = 0xFF;
+ 
 
-  int chunk0 = ones_per_word & mask0;
-  int chunk1 = (ones_per_word & mask1) >> 4;
-  int chunk2 = (ones_per_word & mask2) >> 8;
-  int chunk3 = (ones_per_word & mask3) >> 12;
-  int chunk4 = (ones_per_word & mask4) >> 16;
+  int chunk0 = ones_per_word & maskFF;
+  int chunk1 = (ones_per_word >> 8) & maskFF;
+  int chunk2 = (ones_per_word >> 16) & maskFF;
+  int chunk3 = (ones_per_word >> 24) & maskFF;
 
 
-
+  return chunk0 + chunk1 + chunk2 + chunk3;
 }
 /* 
  * bang - Compute !x without using !
@@ -287,7 +298,17 @@ int bitCount(int x) {
  *   Rating: 4 
  */
 int bang(int x) {
-  return 2;
+
+  // printf("x = %x \n", x);
+  int negative_x = (~ x) + 1;
+  // printf("-x = %x \n", negative_x);
+  int or_negative_x = negative_x | x ; 
+  int negative_x = or_negative_x >> 31;
+
+  // when x =0 and negative x =0 then or_negative_x =0
+  // when x = not zero and negative x is not zero then or_negative_x = FFF...
+  return ((~negative_x) & 0x1 );
+  
 }
 /* 
  * leastBitPos - return a mask that marks the position of the
@@ -298,7 +319,9 @@ int bang(int x) {
  *   Rating: 2 
  */
 int leastBitPos(int x) {
-  return 2;
+
+  int negative_x = (~ x) + 1;
+  return x & negative_x ;
 }
 /* 
  * TMax - return maximum two's complement integer 
@@ -307,7 +330,9 @@ int leastBitPos(int x) {
  *   Rating: 1
  */
 int tmax(void) {
-  return 0x7fffffff;
+  int inv_tmax = (0x1 << 31);
+
+  return ~inv_tmax ;
 }
 /* 
  * isNonNegative - return 1 if x >= 0, return 0 otherwise 
@@ -317,8 +342,12 @@ int tmax(void) {
  *   Rating: 3
  */
 int isNonNegative(int x) {
-  int first_bit = x & 0x80000000;
-  return !(!first_bit);
+
+  int first_bit = x & (0x1 << 31);
+  // if first bit is 1, then isNonNegative should return 0
+  // if first bit is 0, then isNonNegative should return 1
+
+  return !first_bit;
 }
 /* 
  * isGreater - if x > y  then return 1, else return 0 
@@ -328,7 +357,23 @@ int isNonNegative(int x) {
  *   Rating: 3
  */
 int isGreater(int x, int y) {
-  return 2;
+
+  // if first bits are the same, this is 0, else, 1s
+  int sign_match = ((x^y) & (0x1 << 31)) >> 31;
+  
+  // if signs are the same:
+  //subtract y from x, if the result is positive, x>y
+  int subtractant = x + (~y + 1);
+  int first_bit = subtractant & (0x1 << 31);
+
+  // if the subtractant is zero, return false
+  int is_equal = (!(subtractant) << 31) >>31;
+  int same_signs = (~sign_match) & (~is_equal & !first_bit); 
+  
+  // if signs are different, verify that the first is a 0.
+  int sign_x = x >> 31;
+  int dif_signs = sign_match &( ~sign_x & 1); 
+  return  same_signs | dif_signs;
 }
 /* 
  * divpwr2 - Compute x/(2^n), for 0 <= n <= 30
@@ -339,7 +384,23 @@ int isGreater(int x, int y) {
  *   Rating: 2
  */
 int divpwr2(int x, int n) {
-    return 2;
+
+  int bitmask = 0x1 << 31; //100...0
+  int xsign = (x & bitmask) >> 31; //either all 1s or all 0's depending on sign bit
+
+  // is_not_divisible is 1 if x doesn't divide cleanly into n, 0 otherwise
+  int isolated_last_digits = x << ( 32 + (~n +1) );
+
+  int n_is_zero = ((!n) << 31) >> 31; //111... if n is zero
+
+  int is_not_divisible = !( !( isolated_last_digits )) ; //either 0 or 0x1
+
+  int dividend = x >> n ;
+  // printf(" x = %d, n= %d, patch = %d , result = %d \n", x, n, is_not_divisible, ( (~xsign) & dividend) | ( xsign & (dividend + is_not_divisible)));
+
+  int negative_answer = (n_is_zero & x) | (~n_is_zero & (dividend + is_not_divisible));
+
+  return ( (~xsign) & dividend ) | ( xsign & negative_answer );
 }
 /* 
  * absVal - absolute value of x
@@ -350,7 +411,11 @@ int divpwr2(int x, int n) {
  *   Rating: 4
  */
 int absVal(int x) {
-  return 2;
+
+  int bitmask = 0x1 << 31; //100...0
+  int xsign = (x & bitmask) >> 31; //either all 1s or all 0's depending on sign bit
+
+  return ( (~xsign) & x) | ( xsign & (~x + 1));
 }
 /* 
  * addOK - Determine if can compute x+y without overflow
@@ -361,12 +426,36 @@ int absVal(int x) {
  *   Rating: 3
  */
 int addOK(int x, int y) {
-  return 2;
+  int bitmask = 0x1 << 31; // 10...0
+  int z = x + y;
+  int xs = x & bitmask; //grabbing the sign bit ie 10..0 or 00...0
+  int ys = y & bitmask;
+  int zs = z & bitmask;
+
+  xs = xs >> 31; // all 1's or all 0's 
+  ys = ys >> 31;
+  zs = zs >> 31;
+
+  //checking 3 cases where addOK should be 0x1
+  int allPos = xs & ys & zs;  //10...0 if x y and z all positive, 00000 if not
+  int allNeg = ~xs & ~ys & ~zs;
+  int sNotEqualy = xs ^ ys;
+
+  allPos = (allPos & 1); //if all 1's should be 0x1, otherwise 0
+  allNeg = (allNeg & 1);
+  sNotEqualy = (sNotEqualy & 1);
+
+  return allPos | allNeg | sNotEqualy;
+
+
+
+
 }
 
 // int main(int argc, char *argv[])
-// {
-
-//   logicalShift(2, 0);
-
+//  {
+//  // printf("inputs 0x8000000, shifted by 1\n");
+//  // int result = logicalShift(0x80000000, 1);
+//  // printf("%x", result);
+//  // return 0;
 // }
